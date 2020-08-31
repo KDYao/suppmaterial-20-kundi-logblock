@@ -27,3 +27,9 @@ The impact on relative compression speed from disabling each preprocessing heuri
 ### The block sizes that Logzip begin to outperform LogBlock.
 The relative compression ratio and relative compression speed using Logzip to LogBlock on different block sizes. In each sub-figure, the x axis shows the block sizes (from 16KB to the size of the log file or 32MB) and the y axis refers to the compression performance value (in log-scale) with different compressors. The black box indicates the sizes at which Logzip begins to statistically outperform LogBlock in terms of the compression ratio. The horizontal red line at zero (log2 1) implies the same relative compression ratio or speed achieved by two preprocessing approaches.
 ![LogBlock Logzip_compare](../figs/Logzip_LogBlock_compare.jpg)
+
+
+## The compression performance of different log compression approaches on small logs
+The following results are included in the appendix section of the paper.
+![log_compression_approaches_compare_ratio](../figs/Value_Compression_Ratio.jpg)
+![log_compression_approaches_compare_speed](../figs/Value_Compression_Speed.jpg)
