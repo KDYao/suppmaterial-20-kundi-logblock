@@ -32,8 +32,8 @@ To access the full dataset, please contact [Loghub](https://github.com/logpai/lo
   
 
 The repository contains framework for evaluating different log preprocessing approaches. We take the following approaches into consideration. 
-> * [LogBlock](./LogBlock) - Reduce repetitiveness through preprocessing heuritstics. Please check the full paper for more details: [Logzip: Extracting Hidden Structures via Iterative Clustering for Log Compression](https://ieeexplore.ieee.org/document/8952406).
-> * [LogZip](https://github.com/logpai/logzip) - Extract reptitve template & variables through iterative clustering.  
+> * [LogBlock](./LogBlock) - Reduce repetitiveness through preprocessing heuritstics. 
+> * [LogZip](https://github.com/logpai/logzip) - Extract reptitve template & variables through iterative clustering. Please check the full paper for more details: [Logzip: Extracting Hidden Structures via Iterative Clustering for Log Compression](https://ieeexplore.ieee.org/document/8952406). 
 > * [Cowic](https://github.com/linhao1990/cowic) - Compress log entries with pretrain a compression models. Please check the full paper for more details: [Cowic: A Column-Wise Independent Compression for Log Stream Analysis](https://ieeexplore.ieee.org/document/7152468). 
 > * [LogArchive](https://github.com/robertchristensen/log_archive_v0) (not taken into comparison) - Cluster log messages according to text similarity then compress. For more details, please check: [Adaptive log compression for massive log data](https://dl.acm.org/doi/10.1145/2463676.2465341).
 
