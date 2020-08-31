@@ -7,9 +7,7 @@ This is the replcation package for the paper titled "Improving State-of-the-art 
 LogBlock is a log preprocessing tool that improves the compression of small blocks of log data.
 Modern log management tools usually splits log data into small blocks to improve the performance of information query. As shown in the following table, different sizes are adopted by different log management tools 
 LogBlock has better compression ratio than direct compression, or traditional log preprocessing tools which have good compression ratio on large-sized log files.
-The workflow of LogBlock is as follows:
 
-![Alt text](./figs/Logblock_workflow.jpg?raw=true "Workflow of LogBlock")
 
 ### Block sizes used by log management tools:
 
