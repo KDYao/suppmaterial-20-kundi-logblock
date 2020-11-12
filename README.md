@@ -1,7 +1,7 @@
 # LogBlock
 
 ### About LogBlock
-This is the replcation package for the paper titled "Improving State-of-the-art Compression Techniques for Log Management Tools". 
+This is the replication package for the paper titled "Improving State-of-the-art Compression Techniques for Log Management Tools". 
 
  
 LogBlock is a log preprocessing tool that improves the compression of small blocks of log data.

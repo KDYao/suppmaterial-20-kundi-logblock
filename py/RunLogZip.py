@@ -8,10 +8,15 @@ import time
 import re
 import argparse
 sys.path.insert(1, os.path.realpath(os.path.pardir))
-from logzip_public.logzip_demo import Ziplog
-from logzip_public.matcher import treematch
-from logzip_public.logparser import Drain
 
+try:
+    from logzip_public.logzip_demo import Ziplog
+    from logzip_public.matcher import treematch
+    from logzip_public.logparser import Drain
+except ModuleNotFoundError as e:
+    print(e)
+    print('Since we cannot hold third-party source code due to copyright reasons, '
+                              'please download source code from: https://github.com/logpai/logzip')
 
 def boolean_string(s):
     if s not in {'False', 'True'}:
@@ -43,12 +48,13 @@ def baseN(num, b):
 
 
 class RunZipLog:
-    def __init__(self, dataset, setting, path, isCompress, out_dir="./zip_out/", tmp_dir="./zip_out/tmp_dir"):
+    def __init__(self, dataset, setting, path, isCompress, out_dir="./zip_out/", tmp_dir="./zip_out/tmp_dir", isKeepTemplate=False):
         self.args = None
         self.st = setting['st']
         self.depth = setting['depth']
         self.regex = setting['regex']
         self.isCompress=isCompress
+        self.isKeepTemplate = isKeepTemplate
         try:
             parser = argparse.ArgumentParser()
             parser.add_argument('--file', type=str, default=path)
@@ -136,7 +142,8 @@ class RunZipLog:
                         lossy=lossy,
                         compress_single=compress_single,
                         n_workers=n_workers,
-                        isCompress=self.isCompress)
+                        isCompress=self.isCompress,
+                        isKeepTemplate=self.isKeepTemplate)
 
         zipper.zip_file(para_df=structured_log)
         zipper_end_time = time.time()

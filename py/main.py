@@ -1,3 +1,4 @@
+import pickle
 import random
 import re
 import os
@@ -12,14 +13,14 @@ import queue
 from datetime import datetime, timedelta
 from enum import Enum
 import pandas as pd
-
 sys.path.insert(1, os.path.realpath(os.path.pardir))
 from py.RunLogZip import RunZipLog
 from py.RunCowic import RunCowic
 from py.RunLogArchive import RunLogArchive
 from LogBlock.LogBlock import LogBlock
-from py.Util import elpased_time, _getAllFiles, run_async, run_async_multiprocessing
 
+from ExtraBucket.ExtraBucket import RunExtraBucket, ParseTemplate
+from py.Util import elpased_time, _getAllFiles, run_async, run_async_multiprocessing
 
 # Import write lock
 try:
@@ -28,8 +29,6 @@ try:
 except ImportError:
     from threading import Lock
     lock = Lock()
-
-
 
 # Set working directory under the py directory
 file_dir = os.path.dirname(os.path.realpath(__file__))
@@ -296,6 +295,265 @@ benchmark_settings_local = {
         },
 }
 
+# TODO: remove server side setups
+benchmark_settings_server = {
+    'HDFS': {
+        'log_file': 'HDFS.log',
+        'log_format': '<Date> <Time> <Pid> <Level> <Component>: <Content>',
+        'regex': [r'blk_-?\d+', r'(\d+\.){3}\d+(:\d+)?'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Hadoop': {
+        'log_file': 'Hadoop.log',
+        'log_format': '<Date> <Time> <Level> \[<Process>\] <Component>: <Content>',
+        'regex': [r'(\d+\.){3}\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Spark': {
+        'log_file': 'Spark.log',
+        'log_format': '<Date> <Time> <Level> <Component>: <Content>',
+        'regex': [r'(\d+\.){3}\d+', r'\b[KGTM]?B\b', r'([\w-]+\.){2,}[\w-]+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Zookeeper': {
+        'log_file': 'Zookeeper.log',
+        'log_format': '<Date> <Time> - <Level>  \[<Node>:<Component>@<Id>\] - <Content>',
+        'regex': [r'(/|)(\d+\.){3}\d+(:\d+)?'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'BGL': {
+        'log_file': 'BGL.log',
+        'log_format': '<Label> <Timestamp> <Date> <Node> <Time> <NodeRepeat> <Type> <Component> <Level> <Content>',
+        'regex': [r'core\.\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'HPC': {
+        'log_file': 'HPC.log',
+        'log_format': '<LogId> <Node> <Component> <State> <Time> <Flag> <Content>',
+        'regex': [r'=\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Thunderbird': {
+        'log_file': 'Thunderbird.log',
+        'log_format': '<Label> <Timestamp> <Date> <User> <Month> <Day> <Time> <Location> <Component>(\[<PID>\])?: <Content>',
+        'regex': [r'(\d+\.){3}\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Windows': {
+        'log_file': 'Windows.log',
+        'log_format': '<Date> <Time>, <Level>                  <Component>    <Content>',
+        'regex': [r'0x.*?\s'],
+        'st': 0.7,
+        'depth': 5
+        },
+
+    'Linux': {
+        'log_file': 'Linux.log',
+        'log_format': '<Month> <Date> <Time> <Level> <Component>(\[<PID>\])?: <Content>',
+        'regex': [r'(\d+\.){3}\d+', r'\d{2}:\d{2}:\d{2}'],
+        'st': 0.39,
+        'depth': 6
+        },
+
+    'Android': {
+        'log_file': 'Android.log',
+        'log_format': '<Date> <Time>  <Pid>  <Tid> <Level> <Component>: <Content>',
+        'regex': [r'(/[\w-]+)+', r'([\w-]+\.){2,}[\w-]+', r'\b(\-?\+?\d+)\b|\b0[Xx][a-fA-F\d]+\b|\b[a-fA-F\d]{4,}\b'],
+        'st': 0.2,
+        'depth': 6
+        },
+
+    'HealthApp': {
+        'log_file': 'HealthApp.log',
+        'log_format': '<Time>\|<Component>\|<Pid>\|<Content>',
+        'regex': [],
+        'st': 0.2,
+        'depth': 4
+        },
+
+    'Apache': {
+        'log_file': 'Apache.log',
+        'log_format': '\[<Time>\] \[<Level>\] <Content>',
+        'regex': [r'(\d+\.){3}\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Proxifier': {
+        'log_file': 'Proxifier.log',
+        'log_format': '\[<Time>\] <Program> - <Content>',
+        'regex': [r'<\d+\ssec', r'([\w-]+\.)+[\w-]+(:\d+)?', r'\d{2}:\d{2}(:\d{2})*', r'[KGTM]B'],
+        'st': 0.6,
+        'depth': 3
+        },
+
+    'OpenSSH': {
+        'log_file': 'OpenSSH.log',
+        'log_format': '<Date> <Day> <Time> <Component> sshd\[<Pid>\]: <Content>',
+        'regex': [r'(\d+\.){3}\d+', r'([\w-]+\.){2,}[\w-]+'],
+        'st': 0.6,
+        'depth': 5
+        },
+
+    'OpenStack': {
+        'log_file': 'OpenStack.log',
+        'log_format': '<Logrecord> <Date> <Time> <Pid> <Level> <Component> \[<ADDR>\] <Content>',
+        'regex': [r'((\d+\.){3}\d+,?)+', r'/.+?\s', r'\d+'],
+        'st': 0.5,
+        'depth': 5
+        },
+
+    'Mac': {
+        'log_file': 'Mac.log',
+        'log_format': '<Month>  <Date> <Time> <User> <Component>\[<PID>\]( \(<Address>\))?: <Content>',
+        'regex': [r'([\w-]+\.){2,}[\w-]+'],
+        'st': 0.7,
+        'depth': 6
+        },
+}
+benchmark_settings_finer_server = {
+    'HDFS': {
+        'log_file': 'HDFS.log',
+        'log_format': '<Year:2><Month:2><Day:2> <Hour:2><Minute:2><Second:2> <Pid> <Level> <Component>: <Content>',
+        'regex': [r'blk_-?\d+', r'(\d+\.){3}\d+(:\d+)?'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Hadoop': {
+        'log_file': 'Hadoop.log',
+        'log_format': '<Year:4>-<Month:2>-<Day:2> <Hour:2>:<Minute:2>:<Second:2>,<Millisecond:3> <Level> \[<Process>\] <Component>: <Content>',
+        'regex': [r'(\d+\.){3}\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Spark': {
+        'log_file': 'Spark.log',
+        'log_format': '<Year:2>/<Month:2>/<Day:2> <Hour:2>:<Minute:2>:<Second:2> <Level> <Component>: <Content>',
+        'regex': [r'(\d+\.){3}\d+', r'\b[KGTM]?B\b', r'([\w-]+\.){2,}[\w-]+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Zookeeper': {
+        'log_file': 'Zookeeper.log',
+        'log_format': '<Year:4>-<Month:2>-<Day:2> <Hour:2>:<Minute:2>:<Second:2>,<Millisecond:3> - <Level>  \[<Node>:<Component>@<Id>\] - <Content>',
+        'regex': [r'(/|)(\d+\.){3}\d+(:\d+)?'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'BGL': {
+        'log_file': 'BGL.log',
+        'log_format': '<Label> <Timestamp> <Year1:4>.<Month1:2>.<Day1:2> <Node> <Year:4>-<Month:2>-<Day:2>-<Hour:2>.<Minute:2>.<Second:2>.<Millisecond:6> <NodeRepeat> <Type> <Component> <Level> <Content>',
+        'regex': [r'core\.\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'HPC': {
+        'log_file': 'HPC.log',
+        'log_format': '<LogId> <Node> <Component> <State> <Time> <Flag> <Content>',
+        'regex': [r'=\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Thunderbird': {
+        'log_file': 'Thunderbird.log',
+        'log_format': '<Label> <Timestamp> <DYear:4>.<DMonth:2>.<DDay:2> <User> <Month> <Day> <Hour:2>:<Minute:2>:<Second:2> <Location> <Component>(\[<PID>\])?: <Content>',
+        'regex': [r'(\d+\.){3}\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Windows': {
+        'log_file': 'Windows.log',
+        'log_format': '<Year:4>-<Month:2>-<Day:2> <Hour:2>:<Minute:2>:<Second:2>, <Level>                  <Component>    <Content>',
+        'regex': [r'0x.*?\s'],
+        'st': 0.7,
+        'depth': 5
+        },
+
+    'Linux': {
+        'log_file': 'Linux.log',
+        'log_format': '<Month> <Date> <Hour:2>:<Minute:2>:<Second:2> <Level> <Component>(\[<PID>\])?: <Content>',
+        'regex': [r'(\d+\.){3}\d+', r'\d{2}:\d{2}:\d{2}'],
+        'st': 0.39,
+        'depth': 6
+        },
+
+    'Android': {
+        'log_file': 'Android.log',
+        'log_format': '<Month:2>-<Day:2> <Hour:2>.<Minute:2>.<Second:2>.<Millisecond:3>  <Pid>  <Tid> <Level> <Component>: <Content>',
+        'regex': [r'(/[\w-]+)+', r'([\w-]+\.){2,}[\w-]+', r'\b(\-?\+?\d+)\b|\b0[Xx][a-fA-F\d]+\b|\b[a-fA-F\d]{4,}\b'],
+        'st': 0.2,
+        'depth': 6
+        },
+
+    'HealthApp': {
+        'log_file': 'HealthApp.log',
+        'log_format': '<Year:4><Month:2><Day:2>-<Hour:2>:<Minute:2>:<Second:2>:<Millisecond:3>\|<Component>\|<Pid>\|<Content>',
+        'regex': [],
+        'st': 0.2,
+        'depth': 4
+        },
+
+    'Apache': {
+        'log_file': 'Apache.log',
+        'log_format': '\[<Date:3> <Month:3> <Day:2> <Hour:2>:<Minute:2>:<Second:2> <Year:4>\] \[<Level>\] <Content>',
+        'regex': [r'(\d+\.){3}\d+'],
+        'st': 0.5,
+        'depth': 4
+        },
+
+    'Proxifier': {
+        'log_file': 'Proxifier.log',
+        'log_format': '\[<Month:2>.<Day:2> <Hour:2>:<Minute:2>:<Second:2>\] <Program> - <Content>',
+        'regex': [r'<\d+\ssec', r'([\w-]+\.)+[\w-]+(:\d+)?', r'\d{2}:\d{2}(:\d{2})*', r'[KGTM]B'],
+        'st': 0.6,
+        'depth': 3
+        },
+
+    'OpenSSH': {
+        'log_file': 'OpenSSH.log',
+        'log_format': '<Date> <Day> <Hour:2>:<Minute:2>:<Second:2> <Component> sshd\[<Pid>\]: <Content>',
+        'regex': [r'(\d+\.){3}\d+', r'([\w-]+\.){2,}[\w-]+'],
+        'st': 0.6,
+        'depth': 5
+        },
+
+    'OpenStack': {
+        'log_file': 'OpenStack.log',
+        'log_format': 'nova-<ComponentName>.log(.<Index>)?.<Year1:4>-<Month1:2>-<Day1:2>_<Hour1:2>:<Minute1:2>:<Second1:2> <Year:4>-<Month:2>-<Day:2> <Hour:2>:<Minute:2>:<Second:2>.<Millisecond:3> <Pid> <Level> <Component> \[<ADDR>\] <Content>',
+        'regex': [r'((\d+\.){3}\d+,?)+', r'/.+?\s', r'\d+'],
+        'st': 0.5,
+        'depth': 5
+        },
+
+    'Mac': {
+        'log_file': 'Mac.log',
+        'log_format': '<Month>  <Date> <Hour:2>:<Minute:2>:<Second:2> <User> <Component>\[<PID>\]( \(<Address>\))?: <Content>',
+        'regex': [r'([\w-]+\.){2,}[\w-]+'],
+        'st': 0.7,
+        'depth': 6
+        },
+}
 
 compressor_config = {
     # Remember to save compressed file in the same folder
@@ -322,14 +580,12 @@ compressor_config = {
     }
 }
 
-
-
 class Option(Enum):
     S1 = 'LogBlock'
     S2 = 'LogZip'
     S3 = 'Cowic'
     S4 = 'LogArchive'
-
+    S5 = 'ExtraBucket'
 
 
 def convert_size(size, round_digit = 2, isConversion = False):
@@ -1057,6 +1313,108 @@ def log_archive(dataset, setting, output_root_dir, compressor, chunkSizeList, re
                 print('[ERROR]: %s occur when processing log %s' % (e, logpath))
     return dict_list
 
+@elpased_time
+def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat, template_dir='../template'):
+    #FIXME!!!!
+    dict_list = []
+
+    if not os.path.isdir(template_dir):
+        os.makedirs(template_dir)
+
+    original_log_path = os.path.join(input_dir, setting['log_file'])
+    original_log_template_path = os.path.join(template_dir, os.path.basename(setting['log_file']) + '.pkl')
+
+    ori_log_size = get_total_size_of_extension(os.path.dirname(original_log_path), os.path.basename(original_log_path))
+
+    if not os.path.isfile(original_log_template_path):
+        parsing_time_path = '../result/parsing_time.log'
+        # Generate templates if not exist
+        parTemp = ParseTemplate(logName=dataset, setting=setting)
+        df_template, parsing_time = parTemp.parse_template_from_all(fp=original_log_path)
+        try:
+            # Record parsing result
+            with open(original_log_template_path, 'wb') as wpkl:
+                pickle.dump(df_template, wpkl)
+            wpkl.close()
+        except Exception as e:
+            print(e)
+            df_template.to_csv(original_log_template_path, index=False)
+
+        with lock:
+            if os.path.isfile(parsing_time_path):
+                with open(parsing_time_path, 'a') as wparse:
+                    wparse.write('File: {}, Parsing time {}\n'.format(setting['log_file'], parsing_time))
+                wparse.close()
+            else:
+                with open(parsing_time_path, 'w') as wparse:
+                    wparse.write('File: {}, Parsing time {}\n'.format(setting['log_file'], parsing_time))
+                wparse.close()
+
+    # Load templates
+    template_load_start_time = datetime.now()
+    with open(original_log_template_path, 'rb') as rpkl:
+        df_template = pickle.load(rpkl)
+    rpkl.close()
+    template_load_time = datetime.now() - template_load_start_time
+
+
+    for chunkSize in chunkSizeList:
+
+        if revert_size(chunkSize) > ori_log_size:
+            break
+
+        log_path_list = generate_random_chunk(path=original_log_path, repeat=repeat, dataset=dataset,
+                                              chunkSize=chunkSize)
+
+        for logpath in log_path_list:
+
+            out_dir = os.path.sep.join([output_root_dir, 'bucket_%s_%s' % (dataset, chunkSize),
+                                        "bucket_" + os.path.basename(logpath).split(os.extsep)[0]])
+            try:
+                # Generate a random chunk
+                extra_bucket = RunExtraBucket(
+                    setting=setting,
+                    path=logpath,
+                    df_template=df_template,
+                    tmp_dir=out_dir,
+                    out_dir=out_dir,
+                    isCompress=False
+                )
+
+                prep_time = cmd_execute_time(extra_bucket.run)
+
+                # Compress from here
+                d = get_compress_info(
+                    path=logpath,
+                    bucket_dir=out_dir,
+                    compressor_list=compressor,
+                    dataset=dataset,
+                    repeat=1
+                )
+
+                chunk_id = os.path.basename(logpath).split('_')[0]
+
+                # Read characters
+                dict_characters = read_log_characters(extra_bucket.stuctured_log)
+
+                if isinstance(d, list):
+                    for x in d:
+                        x["PreprocessingTime"] = seconds_to_hh_mm_ss(prep_time)
+                        x["ChunkSize"] = chunkSize
+                        x["ChunkId"] = chunk_id
+                        for key, value in dict_characters.items():
+                            x[key] = value
+                    dict_list += d
+                elif isinstance(d, dict):
+                    d["PreprocessingTime"] = seconds_to_hh_mm_ss(prep_time)
+                    d["ChunkSize"] = chunkSize
+                    d["ChunkId"] = chunk_id
+                    d = {**d, **dict_characters}
+                    dict_list.append(d)
+            except Exception as e:
+                print('[ERROR]: %s occur when processing log %s' % (e, logpath))
+    return dict_list
+
 
 def get_total_size_of_extension(dir, ext):
     return sum([getsize(x) for x in _getAllFiles(folder=dir, ext=ext)])
@@ -1110,15 +1468,15 @@ def compress_var_extraction_result(dirpath, compressor_settings, repeat=1, dict=
         d_type_ext['TransposedFile'] = [f for f in _getAllFiles(folder=dirpath, ext='_trans_file.txt%d' % max_ext_num) if f.split('log_')[-1] not in d_type_ext.values()]
         # isOutputDetails = True
 
-        for k, v in d_type_ext.items():
-            if isinstance(v, str):
-                vpath_list = [x for x in _getAllFiles(folder=dirpath, ext='') if x.endswith(v)]
-                if len(vpath_list) > 0:
-                    dict['Prep: Ori Size Of %s' % k] = convert_size(getsize(vpath_list[0]))
-                else:
-                    dict['Prep: Ori Size Of %s' % k] = '0K'
-            elif isinstance(v, list):
-                dict['Prep: Ori Size Of %s' % k] = convert_size(sum([getsize(x) for x in v]))
+        # for k, v in d_type_ext.items():
+        #     if isinstance(v, str):
+        #         vpath_list = [x for x in _getAllFiles(folder=dirpath, ext='') if x.endswith(v)]
+        #         if len(vpath_list) > 0:
+        #             dict['Prep: Ori Size Of %s' % k] = convert_size(getsize(vpath_list[0]))
+        #         else:
+        #             dict['Prep: Ori Size Of %s' % k] = '0K'
+        #     elif isinstance(v, list):
+        #         dict['Prep: Ori Size Of %s' % k] = convert_size(sum([getsize(x) for x in v]))
 
     else:
         # isOutputDetails = False
@@ -1149,19 +1507,19 @@ def compress_var_extraction_result(dirpath, compressor_settings, repeat=1, dict=
 
     # Get size for different parts
 
-    if type == 1:
-        for k, v in d_type_ext.items():
-            if isinstance(v, str):
-                v = v + '.' + ext
-                vpath_list = [x for x in _getAllFiles(folder=dirpath, ext='') if x.endswith(v)]
-                if len(vpath_list) > 0:
-                    dict['Prep: Compressed Size Of %s' % k] = convert_size(getsize(vpath_list[0]))
-                else:
-                    # When file not exist
-                    # Usually occurs at fail to match
-                    dict['Prep: Compressed Size Of %s' % k] = '0K'
-            elif isinstance(v, list):
-                dict['Prep: Compressed Size Of %s' % k] = convert_size(sum([getsize(x + '.' + ext) for x in v]))
+    # if type == 1:
+    #     for k, v in d_type_ext.items():
+    #         if isinstance(v, str):
+    #             v = v + '.' + ext
+    #             vpath_list = [x for x in _getAllFiles(folder=dirpath, ext='') if x.endswith(v)]
+    #             if len(vpath_list) > 0:
+    #                 dict['Prep: Compressed Size Of %s' % k] = convert_size(getsize(vpath_list[0]))
+    #             else:
+    #                 # When file not exist
+    #                 # Usually occurs at fail to match
+    #                 dict['Prep: Compressed Size Of %s' % k] = '0K'
+    #         elif isinstance(v, list):
+    #             dict['Prep: Compressed Size Of %s' % k] = convert_size(sum([getsize(x + '.' + ext) for x in v]))
 
     #total_compress_time = '{!s}'.format(sum(total_compress_time))
 
@@ -1184,7 +1542,6 @@ def compress_var_extraction_result(dirpath, compressor_settings, repeat=1, dict=
 
     total_compressed_size += filetype_compressed_size
 
-
     if type == 0:
         dict["Original Size Compreseed"] = convert_size(total_compressed_size/repeat)
         dict["Original Compress Time"] = seconds_to_hh_mm_ss(seconds=total_compress_time/repeat)
@@ -1204,8 +1561,9 @@ if __name__ == '__main__':
     # S2 = 'LogZip'
     # S3 = 'Cowic'
     # S4 = 'LogArchive'
+    # S5 = 'ExtraBucket'
     #####################################
-    opt = Option.S1
+    opt = Option.S5
 
     compressor = list(compressor_config.keys())
 
@@ -1213,7 +1571,6 @@ if __name__ == '__main__':
     input_dir = '../logs'
     repeat = 100
 
-    #chunkSize = ['32K', '256K', '512K', '1M']
     chunkSize = ['16K', '32K', '64K', '128K']
 
     # If disable, this will block step1 to step4 one by one
@@ -1231,20 +1588,47 @@ if __name__ == '__main__':
 
     jobs = []
 
-    if opt == Option.S2:
-        benchmark_settings = benchmark_settings_local
-    else:
-        benchmark_settings = benchmark_settings_finer_local
+    # if opt == Option.S2 or opt == Option.S5:
+    #     benchmark_settings = benchmark_settings_local
+    # else:
+    #     benchmark_settings = benchmark_settings_finer_local
+
+    if platform.system() == 'Darwin':
+        input_dir = '../logs'
+        if opt == Option.S2 or opt == Option.S5:
+            benchmark_settings = benchmark_settings_local
+        else:
+            benchmark_settings = benchmark_settings_finer_local
+    elif platform.system() == 'Linux':
+            if socket.gethostname() in ['pinky', 'brain2']:
+                input_dir = '/home/local/SAIL/kundi/archive/LogHub'
+            else:
+                # Compute canada
+                input_dir = '/home/kundiyao/projects/def-ahmedh/kundiyao/scratch/dataset/LogHub'
+            if opt == Option.S2 or opt == Option.S5:
+                benchmark_settings = benchmark_settings_server
+            else:
+                benchmark_settings = benchmark_settings_finer_server
 
     for dataset, setting in benchmark_settings.items():
-        ignore_datasets = []
+        # FIXME
 
-        # FIXME: remove this
-        if dataset != 'HDFS':
-            continue
+        # Final version
+        eval_datasets = benchmark_settings.keys()
 
-        if dataset not in ignore_datasets:
+        # Parsing small datasets (1 day):
+        #eval_datasets = ['Hadoop', 'Zookeeper', 'HPC', 'Linux', 'Android', 'HealthApp', 'Apache', 'Proxifier', 'OpenSSH', 'OpenStack', 'Mac']
 
+        # Parsing mid datasets (1 day): HDFS, Spark
+        #eval_datasets = ['HDFS', 'Spark']
+
+        # Parsing large dataset (10 days): Thunderbird
+        #eval_datasets = ['Thunderbird']
+
+        # Parsing large dataset (10 days): Windows
+        #eval_datasets = ['Windows']
+
+        if dataset in eval_datasets:
             # Disable multiprocessing to capture time info;
             #@run_async_multiprocessing
             def parallel_processing(
@@ -1296,6 +1680,15 @@ if __name__ == '__main__':
                         chunkSizeList=chunkSize,
                         repeat=repeat
                     )
+                elif opt == Option.S5:
+                    dict = extra_bucket(
+                        dataset=dataset,
+                        setting=setting,
+                        output_root_dir=output_data_dir,
+                        compressor=compressor,
+                        chunkSizeList=chunkSize,
+                        repeat=repeat
+                    )
 
                 if len(dict) == 0:
                     return None
@@ -1304,7 +1697,6 @@ if __name__ == '__main__':
                 df = df.append(dict, ignore_index=True)
 
                 df = df.reindex(sorted(df.columns), axis=1)
-
 
                 with lock:
                     if os.path.isfile(result_out_path):

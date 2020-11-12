@@ -1,6 +1,6 @@
 ## Design
 
-LogBlock first splits log compoents into different columns, so the log data is regarded as a matrix.
+LogBlock first splits log data into different columns, so the log data is regarded as a matrix.
 Then, the matrix is transposed to gather similar tokens which can be easily referable by the sliding window encoder (see the [shortcomings of sliding window](https://cs.stanford.edu/people/eroberts/courses/soco/projects/data-compression/lossless/lz77/shortcoming.htm)). 
 Finally, each type of repetitiveness in log data will be further reduced by its corresponding heuristic. The overall workflow is shown in the following figure.
 
@@ -14,7 +14,7 @@ The relative compression ratio (in log-scale) between compression without and af
 ![LogBlock relativecompratio](../figs/Logblock_RelativeCompRatio.jpg)
 
 
-### The impact of each prerprocessing heuristic on the compression performance.
+### The impact of each preprocessing heuristic on the compression performance.
 The impact on relative compression ratio from disabling each preprocessing heuristic. The y-axis measures the relative compression ratio loss in percentage. Bars with a border imply that a statistically significant difference occurs after excluding such a heuristic. H1 refers to Extract unique tokens. H2 refers to Delta encoding for numbers. H3 refers to Build dictionary for repetitive tokens. H4 refers to Extract common prefix strings.
 ![LogBlock skip_heuristic_ratio](../figs/LogBlock_SkipStepCompRatioLoss.jpg)
 
