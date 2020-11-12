@@ -1592,7 +1592,7 @@ if __name__ == '__main__':
     #     benchmark_settings = benchmark_settings_local
     # else:
     #     benchmark_settings = benchmark_settings_finer_local
-
+    # FIXME: Remove once finished testing
     if platform.system() == 'Darwin':
         input_dir = '../logs'
         if opt == Option.S2 or opt == Option.S5:
@@ -1611,22 +1611,13 @@ if __name__ == '__main__':
                 benchmark_settings = benchmark_settings_finer_server
 
     for dataset, setting in benchmark_settings.items():
-        # FIXME
+        inputs = sys.argv
 
-        # Final version
-        eval_datasets = benchmark_settings.keys()
-
-        # Parsing small datasets (1 day):
-        #eval_datasets = ['Hadoop', 'Zookeeper', 'HPC', 'Linux', 'Android', 'HealthApp', 'Apache', 'Proxifier', 'OpenSSH', 'OpenStack', 'Mac']
-
-        # Parsing mid datasets (1 day): HDFS, Spark
-        #eval_datasets = ['HDFS', 'Spark']
-
-        # Parsing large dataset (10 days): Thunderbird
-        #eval_datasets = ['Thunderbird']
-
-        # Parsing large dataset (10 days): Windows
-        #eval_datasets = ['Windows']
+        if len(inputs) == 1:
+            # Final version
+            eval_datasets = benchmark_settings.keys()
+        else:
+            eval_datasets = inputs[1].split(',')
 
         if dataset in eval_datasets:
             # Disable multiprocessing to capture time info;
