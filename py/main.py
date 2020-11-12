@@ -1356,7 +1356,6 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
         df_template = pickle.load(rpkl)
     rpkl.close()
     template_load_time = datetime.now() - template_load_start_time
-    return []
 
     for chunkSize in chunkSizeList:
 
@@ -1602,6 +1601,9 @@ if __name__ == '__main__':
     elif platform.system() == 'Linux':
             if socket.gethostname() in ['pinky', 'brain2']:
                 input_dir = '/home/local/SAIL/kundi/archive/LogHub'
+            elif socket.gethostname() in ['xishi']:
+                # Soursop
+                input_dir = '/data/kundi/dataset/LogHub'
             else:
                 # Compute canada
                 input_dir = '/home/kundiyao/projects/def-ahmedh/kundiyao/scratch/dataset/LogHub'

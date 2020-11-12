@@ -175,36 +175,28 @@ class RunExtraBucket:
         self.regex = setting['regex']
         self.isCompress = isCompress
 
-        try:
-            parser = argparse.ArgumentParser()
-            parser.add_argument('--file', type=str, default=path)
-            parser.add_argument('--log_format', type=str, default=setting['log_format'])
-            parser.add_argument('--template_file', type=str, default="")
-            parser.add_argument('--tmp_dir', type=str, default=tmp_dir)
-            parser.add_argument('--out_dir', type=str, default=out_dir)
-            parser.add_argument('--compress_single', type=boolean_string, default=False)
-            parser.add_argument('--n_workers', type=int, default=3)
-            parser.add_argument('--level', type=int, default=3)
-            parser.add_argument('--kernel', type=str, default="gz")
-            parser.add_argument('--sample_num', type=int, default=10000)
-            parser.add_argument('--lossy', type=boolean_string, default=False)
-            self.args = vars(parser.parse_args())
-        except Exception as e:
-            print(e)
-            pass
+        self.filepath = path
+        self.kernel = 'gz'
+        self.log_format = setting['log_format']
+        self.compress_single = False
+        self.n_workers = 1
+        self.level = 3
+        self.tmp_dir = tmp_dir
+        self.out_dir = out_dir
+        self.lossy = False
+
+
 
     def run(self):
-        filepath = self.args["file"]
-        kernel = self.args["kernel"]
-        log_format = self.args["log_format"]
-        template_file = self.args["template_file"]
-        compress_single = self.args["compress_single"]
-        sample_num = self.args["sample_num"]
-        n_workers = self.args["n_workers"]
-        level = self.args["level"]
-        tmp_dir = self.args["tmp_dir"]
-        out_dir = self.args["out_dir"]
-        lossy = self.args["lossy"]
+        filepath = self.filepath
+        kernel = self.kernel
+        log_format = self.log_format
+        compress_single = self.compress_single
+        n_workers = self.n_workers
+        level = self.level
+        tmp_dir = self.tmp_dir
+        out_dir = self.out_dir
+        lossy = self.lossy
 
         logname = os.path.basename(filepath)
         outname = logname + ".logzip"
