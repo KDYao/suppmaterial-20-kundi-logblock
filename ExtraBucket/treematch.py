@@ -53,19 +53,18 @@ class PatternMatch(object):
         self.n_workers = n_workers
         self.optimized = optimized
 
-    def match(self, log_filepath, templates):
+    def match(self, log_filepath, templates, match_tree=None):
         print('Processing log file: {}...'.format(log_filepath))
         start_time = datetime.now()
         loader = logloader.LogLoader(self.logformat, self.tmp_dir)
         log_dataframe = loader.load_to_dataframe(log_filepath)
         # log_dataframe = log_dataframe.head(1)
 
-        templates = self._read_templates(templates)
-
-        print('Building match tree...')
-        match_tree = self._build_match_tree(templates)
-
-        print('Matching event templates...')
+        if not match_tree:
+            templates = self._read_templates(templates)
+            print('Building match tree...')
+            match_tree = self._build_match_tree(templates)
+            print('Matching event templates...')
         if self.optimized:
             match_dict = self.match_event(match_tree, log_dataframe['Content'].drop_duplicates().tolist())
         else:

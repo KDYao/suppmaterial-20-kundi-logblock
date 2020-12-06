@@ -10,16 +10,11 @@ import ntpath
 import socket
 import platform
 import queue
+import logging
 from datetime import datetime, timedelta
 from enum import Enum
 import pandas as pd
 sys.path.insert(1, os.path.realpath(os.path.pardir))
-from py.RunLogZip import RunZipLog
-from py.RunCowic import RunCowic
-from py.RunLogArchive import RunLogArchive
-from LogBlock.LogBlock import LogBlock
-
-from ExtraBucket.ExtraBucket import RunExtraBucket, ParseTemplate
 from py.Util import elpased_time, _getAllFiles, run_async, run_async_multiprocessing
 
 # Import write lock
@@ -33,6 +28,16 @@ except ImportError:
 # Set working directory under the py directory
 file_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(file_dir)
+
+log_dir='../runtimeLog'
+if not os.path.isdir(log_dir):
+    os.makedirs(log_dir)
+logging.basicConfig(
+    filename=os.path.join(log_dir, 'CompressionResult.log'),
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%d-%b-%y %H:%M:%S')
+logger = logging.getLogger("CompressionResult")
 
 # We adopt the logpai benchmark
 
@@ -970,6 +975,7 @@ def generate_random_chunk(path, repeat, dataset, temp_dir='../temp', chunkSize='
 
 @elpased_time
 def logblock(dataset, setting, output_root_dir, compressor, chunkSizeList, isDisable = False, repeat=100):
+    from LogBlock.LogBlock import LogBlock
 
     dict_list = []
 
@@ -1131,6 +1137,7 @@ def read_log_characters(structured_log):
 
 @elpased_time
 def logzip(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat=100):
+    from py.RunLogZip import RunZipLog
 
     dict_list = []
 
@@ -1200,6 +1207,8 @@ def logzip(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat=
 
 @elpased_time
 def cowic(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat):
+    from py.RunCowic import RunCowic
+
     dict_list = []
 
     output_root_dir = os.path.abspath(output_root_dir)
@@ -1255,6 +1264,7 @@ def cowic(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat):
 
 @elpased_time
 def log_archive(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat):
+    from py.RunLogArchive import RunLogArchive
     dict_list = []
 
     output_root_dir = os.path.abspath(output_root_dir)
@@ -1315,6 +1325,7 @@ def log_archive(dataset, setting, output_root_dir, compressor, chunkSizeList, re
 
 @elpased_time
 def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, repeat, template_dir='../template'):
+    from ExtraBucket.ExtraBucket import RunExtraBucket, ParseTemplate, BuildTree
     #FIXME!!!!
     dict_list = []
 
@@ -1332,7 +1343,7 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
         parTemp = ParseTemplate(logName=dataset, setting=setting)
         df_template, parsing_time = parTemp.parse_template_from_all(fp=original_log_path)
         try:
-            # Record parsing result
+            # Record parsing result: saved in CSV
             with open(original_log_template_path, 'wb') as wpkl:
                 pickle.dump(df_template, wpkl)
             wpkl.close()
@@ -1350,12 +1361,17 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
                     wparse.write('File: {}, Parsing time {}\n'.format(setting['log_file'], parsing_time))
                 wparse.close()
 
-    # Load templates
+    # Load templates: Stored in CSV format in a pickle
     template_load_start_time = datetime.now()
     with open(original_log_template_path, 'rb') as rpkl:
         df_template = pickle.load(rpkl)
     rpkl.close()
-    template_load_time = datetime.now() - template_load_start_time
+    # Build match tree
+    tree_builder = BuildTree()
+    templates = df_template['EventTemplate']
+    templates = tree_builder.read_templates(templates)
+    match_tree = tree_builder.build_match_tree(templates)
+    template_load_time = (datetime.now() - template_load_start_time).total_seconds()
 
     for chunkSize in chunkSizeList:
 
@@ -1377,10 +1393,15 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
                     df_template=df_template,
                     tmp_dir=out_dir,
                     out_dir=out_dir,
+                    match_tree=match_tree,
                     isCompress=False
                 )
 
+                # Match time is the time used for template matching
+                # Prep time is the total preprocessing time used for processing raw log block into formatted files
+                # Match time is part of the preprocessing time
                 prep_time = cmd_execute_time(extra_bucket.run)
+                match_time = extra_bucket.match_time
 
                 # Compress from here
                 d = get_compress_info(
@@ -1399,19 +1420,26 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
                 if isinstance(d, list):
                     for x in d:
                         x["PreprocessingTime"] = seconds_to_hh_mm_ss(prep_time)
+                        x["MatchTemplateTime"] = seconds_to_hh_mm_ss(match_time)
                         x["ChunkSize"] = chunkSize
                         x["ChunkId"] = chunk_id
+                        x['BuildTreeFromTemplateTime'] = seconds_to_hh_mm_ss(template_load_time)
                         for key, value in dict_characters.items():
                             x[key] = value
                     dict_list += d
                 elif isinstance(d, dict):
                     d["PreprocessingTime"] = seconds_to_hh_mm_ss(prep_time)
+                    d["MatchTemplateTime"] = seconds_to_hh_mm_ss(match_time)
                     d["ChunkSize"] = chunkSize
                     d["ChunkId"] = chunk_id
+                    d['BuildTreeFromTemplateTime'] = seconds_to_hh_mm_ss(template_load_time)
                     d = {**d, **dict_characters}
                     dict_list.append(d)
+
+                logger.info(str(d))
             except Exception as e:
                 print('[ERROR]: %s occur when processing log %s' % (e, logpath))
+    del match_tree
     return dict_list
 
 
@@ -1571,6 +1599,7 @@ if __name__ == '__main__':
     repeat = 100
 
     #chunkSize = ['16K', '32K', '64K', '128K']
+
     chunkSize = ['256K', '512K', '1M', '2M', '4M', '8M', '16M', '32M']
 
     # If disable, this will block step1 to step4 one by one

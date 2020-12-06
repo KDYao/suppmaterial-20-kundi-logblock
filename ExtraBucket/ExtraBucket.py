@@ -6,6 +6,7 @@ import argparse
 import os
 import sys
 import time
+import re
 from datetime import datetime
 from ExtraBucket import Drain, treematch, ZipLog
 
@@ -153,7 +154,6 @@ class ParseTemplate:
 
     def parse_template_from_all(self, fp):
 
-        parse_begin_time = datetime.now()
         parser = Drain.LogParser(log_name=self.logName, log_format=self.logFormat, depth=self.depth, st=self.st, rex=self.regex)
         return parser.parse(fp)
 
@@ -167,7 +167,7 @@ class RunExtraBucket:
     """
     The code refer to logpai's parser
     """
-    def __init__(self, df_template, setting, path, out_dir, tmp_dir, isCompress):
+    def __init__(self, df_template, setting, path, out_dir, tmp_dir, isCompress, match_tree=None):
         self.args = None
         self.df_template = df_template
         self.st = setting['st']
@@ -184,6 +184,7 @@ class RunExtraBucket:
         self.tmp_dir = tmp_dir
         self.out_dir = out_dir
         self.lossy = False
+        self.match_tree = match_tree
 
 
 
@@ -209,7 +210,7 @@ class RunExtraBucket:
 
         matcher_begin_time = datetime.now()
         matcher = treematch.PatternMatch(tmp_dir=tmp_dir, outdir=out_dir, logformat=log_format)
-        structured_log = matcher.match(filepath, self.df_template['EventTemplate'])
+        structured_log = matcher.match(filepath, self.df_template['EventTemplate'], match_tree=self.match_tree)
         matcher_end_time = datetime.now()
         #print("Matcher cost [{:.3f}s]".format(matcher_end_time - matcher_begin_time))
         print("Matcher cost {}".format(str(matcher_end_time - matcher_begin_time)))
@@ -232,6 +233,78 @@ class RunExtraBucket:
         print("Zipper cost {}".format(str(zipper_end_time - zipper_begin_time)))
 
         self.stuctured_log = structured_log
+        self.match_time = (matcher_end_time - matcher_begin_time).total_seconds()
         return zipper_end_time - zipper_begin_time
 
 
+class BuildTree:
+    def message_split(self, message):
+        """
+        Code from logzip
+        :param message:
+        :return:
+        """
+        splitter_regex = re.compile('(<\*>|[^A-Za-z])')
+        tokens = re.split(splitter_regex, message)
+        tokens = list(filter(lambda x: x!='', tokens))
+        tokens = [token for idx, token in enumerate(tokens) if token != '' and not (token == "<*>" and idx > 0 and tokens[idx-1]=="<*>")]
+        # print(tokens)
+        return tokens
+
+    def _preprocess_template(self, template):
+        """
+        Code from logzip
+        :param message:
+        :return:
+        """
+        template = re.sub("<NUM>", "<*>", template)
+        if template.count("<*>") > 5:
+            first_start_pos = template.index("<*>")
+            template = template[0:first_start_pos + 3]
+        return template
+
+    def build_match_tree(self, templates):
+        """
+        Code from Logzip
+        :param templates:
+        :return:
+        """
+        match_tree = {}
+        match_tree["$NO_STAR$"] = {}
+        for event_id, event_template in templates:
+            print(event_id)
+            # Full match
+            if "<*>" not in event_template:
+                match_tree["$NO_STAR$"][event_template] = event_template
+                continue
+            event_template = self._preprocess_template(event_template)
+            template_tokens = self.message_split(event_template)
+            if not template_tokens or event_template=="<*>": continue
+
+            start_token = template_tokens[0]
+            if start_token not in match_tree:
+                match_tree[start_token] = {}
+            move_tree = match_tree[start_token]
+
+            tidx = 1
+            while tidx < len(template_tokens):
+                token = template_tokens[tidx]
+                if token not in move_tree:
+                    move_tree[token] = {}
+                move_tree = move_tree[token]
+                tidx += 1
+            move_tree["".join(template_tokens)] = (len(template_tokens), template_tokens.count("<*>")) # length, count of <*>
+        return match_tree
+
+    def read_templates(self, templates):
+        """
+        Code from Logzip
+        :param templates:
+        :return:
+        """
+        templates_save = []
+        for idx, row in enumerate(templates):
+            event_id = "E" + str(idx)
+            event_template = row
+            templates_save.append((event_id, event_template))
+        return templates_save
