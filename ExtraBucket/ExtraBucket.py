@@ -272,7 +272,6 @@ class BuildTree:
         match_tree = {}
         match_tree["$NO_STAR$"] = {}
         for event_id, event_template in templates:
-            print(event_id)
             # Full match
             if "<*>" not in event_template:
                 match_tree["$NO_STAR$"][event_template] = event_template
