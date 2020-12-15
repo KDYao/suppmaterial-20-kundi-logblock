@@ -189,9 +189,12 @@ def find_template(move_tree, log_tokens, result, parameter_list):
         if "<*>" in move_tree:
             parameter_list.append("")
             move_tree = move_tree["<*>"]
-            for key, value in move_tree.items():
-                if isinstance(value, tuple):
-                    result.append((key, value, tuple(parameter_list)))
+            if isinstance(move_tree, dict):
+                for key, value in move_tree.items():
+                    if isinstance(value, tuple):
+                        result.append((key, value, tuple(parameter_list)))
+            elif isinstance(move_tree, tuple):
+                result.append(('<*>', value, tuple(parameter_list)))
         return
     token = log_tokens[0]
 
