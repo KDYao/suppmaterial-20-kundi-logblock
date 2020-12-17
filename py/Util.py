@@ -7,6 +7,8 @@ from multiprocessing import Process, Pool
 from queue import Queue
 import threading
 import os
+import signal
+from contextlib import contextmanager
 
 logging.basicConfig(filename='runtime.log', level=logging.INFO)
 log = logging.getLogger("Util")
@@ -77,3 +79,14 @@ def run_async_multiprocessing(func):
         proc.start()
         return proc
     return wrapper
+
+@contextmanager
+def time_limit(seconds):
+    def signal_handler(signum, frame):
+        raise TimeoutError("Timed out!")
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)

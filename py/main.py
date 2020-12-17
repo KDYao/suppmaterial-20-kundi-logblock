@@ -8,6 +8,7 @@ import sys
 import glob
 import ntpath
 import socket
+import signal
 import platform
 import queue
 import logging
@@ -15,7 +16,7 @@ from datetime import datetime, timedelta
 from enum import Enum
 import pandas as pd
 sys.path.insert(1, os.path.realpath(os.path.pardir))
-from py.Util import elpased_time, _getAllFiles, run_async, run_async_multiprocessing
+from py.Util import elpased_time, _getAllFiles, run_async, run_async_multiprocessing, time_limit
 
 # Import write lock
 try:
@@ -244,7 +245,9 @@ benchmark_settings_local = {
         },
 
     'Android': {
+        #FIXME
         'log_file': 'Android/Android_10M.log',
+        #'log_file': 'Android/Android.log',
         'log_format': '<Date> <Time>  <Pid>  <Tid> <Level> <Component>: <Content>',
         'regex': [r'(/[\w-]+)+', r'([\w-]+\.){2,}[\w-]+', r'\b(\-?\+?\d+)\b|\b0[Xx][a-fA-F\d]+\b|\b[a-fA-F\d]{4,}\b'],
         'st': 0.2,
@@ -639,7 +642,8 @@ def read_file_to_list(file):
     return line_list
 
 
-def cmd_execute_time(input, cwd=None, isformatTime=False, *args, **kwargs):
+def cmd_execute_time(input, cwd=None, isformatTime=False, timeThresh=None, *args, **kwargs):
+    # Add a time threshold; if the processing time of a processing time exceeds the threshold, then skip
     start_time = datetime.now()
 
     if isinstance(input, str):
@@ -654,7 +658,12 @@ def cmd_execute_time(input, cwd=None, isformatTime=False, *args, **kwargs):
             else:
                 subprocess.Popen(inp, shell=True, cwd=cwd).wait()
     elif callable(input):
-        input(*args, **kwargs)
+        if timeThresh:
+            try:
+                with time_limit(timeThresh):
+                    input(*args, **kwargs)
+            except TimeoutError as e:
+                return None
     end_time = datetime.now()
 
     if isformatTime:
@@ -1385,6 +1394,14 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
 
             out_dir = os.path.sep.join([output_root_dir, 'bucket_%s_%s' % (dataset, chunkSize),
                                         "bucket_" + os.path.basename(logpath).split(os.extsep)[0]])
+
+            # TODO: Temp; to remove after experiment is finished
+            ##########################################
+            block_index = int(os.path.basename(logpath).split('_')[0])
+            if block_index < 34:
+                continue
+            ##########################################
+
             try:
                 # Generate a random chunk
                 extra_bucket = RunExtraBucket(
@@ -1599,8 +1616,8 @@ if __name__ == '__main__':
     repeat = 100
 
     #chunkSize = ['16K', '32K', '64K', '128K']
-
-    chunkSize = ['256K', '512K', '1M', '2M', '4M', '8M', '16M', '32M']
+    chunkSize = ['128K']
+    #chunkSize = ['256K', '512K', '1M', '2M', '4M', '8M', '16M', '32M']
 
     # If disable, this will block step1 to step4 one by one
     # Only works for evaluating LogBlock
