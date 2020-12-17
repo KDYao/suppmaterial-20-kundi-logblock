@@ -664,6 +664,8 @@ def cmd_execute_time(input, cwd=None, isformatTime=False, timeThresh=None, *args
                     input(*args, **kwargs)
             except TimeoutError as e:
                 return None
+        else:
+            input(*args, **kwargs)
     end_time = datetime.now()
 
     if isformatTime:
