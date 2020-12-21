@@ -1399,9 +1399,9 @@ def extra_bucket(dataset, setting, output_root_dir, compressor, chunkSizeList, r
 
             # TODO: Temp; to remove after experiment is finished
             ##########################################
-            block_index = int(os.path.basename(logpath).split('_')[0])
-            if block_index < 34:
-                continue
+            # block_index = int(os.path.basename(logpath).split('_')[0])
+            # if block_index < 34:
+            #     continue
             ##########################################
 
             try:
@@ -1617,8 +1617,7 @@ if __name__ == '__main__':
     input_dir = '../logs'
     repeat = 100
 
-    #chunkSize = ['16K', '32K', '64K', '128K']
-    chunkSize = ['128K']
+    chunkSize = ['16K', '32K', '64K', '128K']
     #chunkSize = ['256K', '512K', '1M', '2M', '4M', '8M', '16M', '32M']
 
     # If disable, this will block step1 to step4 one by one
